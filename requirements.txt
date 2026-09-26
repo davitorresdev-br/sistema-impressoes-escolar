@@ -1,0 +1,13 @@
+# Dependências do backend (app.py) e do agente de impressão.
+# Instale com:  pip install -r requirements.txt
+Flask>=3.0
+flask-cors>=4.0
+python-dotenv>=1.0
+google-auth>=2.0
+requests>=2.31
+# Conta as páginas dos PDFs enviados (consumo/relatório).
+pypdf>=4.0
+# itsdangerous e Werkzeug já vêm com o Flask, mas ficam fixados aqui
+# porque o projeto os usa diretamente (tokens de sessão / hash de senha).
+itsdangerous>=2.1
+Werkzeug>=3.0

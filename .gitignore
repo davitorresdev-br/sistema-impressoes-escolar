@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Banco de dados e uploads (dados reais, nunca versionar)
+banco_dados/*.db
+uploads/
+
+# Node / Vite / React
+node_modules/
+dist/
+.vite/
+
+# Variáveis de ambiente / segredos
+.env
+.env.local
+agente.env
+
+# Arquivos temporários gerados pelo agente ao baixar PDFs para imprimir
+temp_impressao/
+
+# Estado de execução do SumatraPDF (ele cria este arquivo ao lado do .exe)
+SumatraPDF-settings.txt
+
+# Editor / SO
+.vscode/
+.DS_Store
+Thumbs.db
+# Binários de terceiros (baixe à parte, veja o README)
+*.exe
+
+# Front-end
+Front-end/.env
