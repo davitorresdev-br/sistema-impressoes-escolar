@@ -1,0 +1,69 @@
+# Serviço do SERVIDOR (app.py) — Sistema de Impressão do Colégio Ranieri.
+#
+# Instalar:
+#   sudo cp deploy/ubuntu/acalanto.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now acalanto
+#
+# Ver o que está acontecendo:
+#   systemctl status acalanto
+#   journalctl -u acalanto -f
+#
+# NÃO usamos EnvironmentFile: o próprio app.py lê o .env pelo python-dotenv,
+# a partir do WorkingDirectory. Assim o arquivo de configuração é o MESMO nos
+# dois sistemas (Windows e Linux), com as mesmas regras de aspas e acentos —
+# o formato do systemd é mais restrito e quebraria com valores que o dotenv
+# aceita sem reclamar.
+
+[Unit]
+Description=Sistema de Impressão (servidor) — Colégio Ranieri
+Documentation=file:/opt/acalanto/docs/MIGRACAO-UBUNTU.md
+# network-online (e não só network): sem isso o serviço pode subir antes de
+# existir endereço na placa, e o bind falha logo na primeira tentativa.
+After=network-online.target
+Wants=network-online.target
+# Se ficar reiniciando em laço (erro de configuração, por exemplo), para de
+# vez em vez de martelar a máquina — o journalctl mostra o motivo.
+# Estas duas chaves moram em [Unit] desde o systemd 229; em [Service] elas
+# seriam ignoradas com aviso.
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=acalanto
+Group=acalanto
+WorkingDirectory=/opt/acalanto
+ExecStart=/opt/acalanto/.venv/bin/python /opt/acalanto/app.py
+
+# Reinício automático é o ponto principal de estar no systemd: o servidor
+# volta sozinho depois de queda de energia, atualização ou exceção fatal.
+Restart=always
+RestartSec=5s
+
+# O log da aplicação já vai para arquivo (ACALANTO_LOG, rotativo). O que sai
+# no console vai para o journal do systemd.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=acalanto
+
+# ------------------------------------------------------------------
+# Contenção. O serviço lida com PDFs enviados de fora, então vale fechar
+# tudo o que ele não precisa. Se algum dia der "Read-only file system",
+# provavelmente falta um caminho em ReadWritePaths — e não é para trocar
+# ProtectSystem por "off".
+# ------------------------------------------------------------------
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+# O banco (SQLite grava .db, .db-wal e .db-shm) e a pasta de logs são os
+# ÚNICOS lugares em que o serviço escreve.
+ReadWritePaths=/opt/acalanto/banco_dados /opt/acalanto/logs
+
+[Install]
+WantedBy=multi-user.target

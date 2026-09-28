@@ -1,0 +1,18 @@
+# Backup diário do banco, de madrugada.
+#
+#   sudo systemctl enable --now acalanto-backup.timer
+#   systemctl list-timers acalanto-backup
+[Unit]
+Description=Backup diário do Sistema de Impressão
+
+[Timer]
+# 02:30 — fora do horário de impressão, com a máquina ociosa.
+OnCalendar=*-*-* 02:30:00
+# Se a VM estiver desligada na hora marcada, roda assim que ligar. Sem isto,
+# um fim de semana com a máquina desligada simplesmente pularia o backup.
+Persistent=true
+# Espalha o início em até 5 min para não competir com outras tarefas.
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,19 @@
+# Executa o backup do banco. Disparado pelo acalanto-backup.timer — não
+# precisa ser habilitado sozinho (é o timer que se habilita).
+[Unit]
+Description=Backup do banco do Sistema de Impressão
+Documentation=file:/opt/acalanto/docs/MIGRACAO-UBUNTU.md
+# Não faz sentido tentar backup se o banco nem existe.
+ConditionPathExists=/opt/acalanto/banco_dados/acalanto_print.db
+
+[Service]
+Type=oneshot
+User=acalanto
+Group=acalanto
+ExecStart=/opt/acalanto/deploy/ubuntu/backup-banco.sh
+# O script escreve em /var/backups/acalanto e lê o banco.
+ProtectSystem=strict
+ReadWritePaths=/var/backups/acalanto
+ReadOnlyPaths=/opt/acalanto/banco_dados
+PrivateTmp=true
+NoNewPrivileges=true
