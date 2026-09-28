@@ -4,8 +4,8 @@ Portal web que organiza as solicitações de impressão do colégio. Os professo
 enviam o PDF pelo navegador, o pedido entra numa fila, e um agente instalado no
 computador ligado à impressora manda imprimir dentro do horário de expediente.
 
-O objetivo é tirar o Departamento de T.I. do meio do caminho (nada de pendrive,
-e-mail ou WhatsApp com prova em anexo) e, ao mesmo tempo, deixar registrado
+O objetivo é tirar o Departamento de T.I. do meio do caminho (nada de
+e-mail com prova em anexo) e, ao mesmo tempo, deixar registrado
 **quem pediu o quê, quando, e o que foi impresso**.
 
 ## Documentação
