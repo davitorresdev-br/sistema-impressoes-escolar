@@ -6,6 +6,29 @@ venv/
 
 # Banco de dados e uploads (dados reais, nunca versionar)
 banco_dados/*.db
+# Arquivos do WAL do SQLite. Existem desde que o journal_mode virou WAL:
+# são transitórios, mudam a cada escrita e NÃO podem ser versionados —
+# commitá-los junto com o .db daria um banco inconsistente.
+banco_dados/*.db-wal
+banco_dados/*.db-shm
+banco_dados/*.db-journal
+
+# Backups do banco. Na VM eles ficam dentro da pasta do projeto e são
+# cópias inteiras do banco (~190 MB cada): é o mesmo dado real do .db,
+# com o agravante de haver um por dia.
+backups/
+*.db.gz
+
+# Radiografia do banco gerada na migração — traz contagens e hashes dos
+# PDFs de pessoas reais.
+banco-antes.txt
+banco-depois.txt
+
+# Logs da aplicação e do agente. Trazem nome de usuário, IP e horário de
+# quem usou o sistema: são dados de pessoas, não código.
+*.log
+# ... exceto se algum dia quisermos um exemplo commitado de propósito.
+!exemplo.log
 uploads/
 
 # Node / Vite / React
@@ -28,8 +51,8 @@ SumatraPDF-settings.txt
 .vscode/
 .DS_Store
 Thumbs.db
-# Binários de terceiros (baixe à parte, veja o README)
+# Binários de terceiros e pastas de ferramentas locais
 *.exe
-
-# Front-end
+graphify-out/
+.claude/settings.local.json
 Front-end/.env

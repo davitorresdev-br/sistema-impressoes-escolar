@@ -1,0 +1,12 @@
+# Arquivos que o LINUX lê, mesmo quando editados no Windows.
+#
+# Como o core.autocrlf aqui está em "true", um clone novo no Windows
+# entregaria estes arquivos com CRLF — e aí o shell reclama de
+# "\r: command not found" e o systemd não carrega a unidade. Ficam
+# fixados em LF para não depender da máquina onde o clone foi feito.
+*.sh        text eol=lf
+*.service   text eol=lf
+*.timer     text eol=lf
+
+# O nginx também não gosta de CRLF nos arquivos de configuração.
+deploy/ubuntu/nginx-acalanto.conf text eol=lf

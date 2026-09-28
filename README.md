@@ -15,6 +15,8 @@ e-mail ou WhatsApp com prova em anexo) e, ao mesmo tempo, deixar registrado
 | [docs/ARQUITETURA.md](docs/ARQUITETURA.md) | Como as peças se encaixam, banco de dados e cargos |
 | [docs/MANUTENCAO.md](docs/MANUTENCAO.md) | **Manutenção preventiva**: rotinas, backup e solução de problemas |
 | [docs/API.md](docs/API.md) | Referência das rotas (para diagnóstico) |
+| [docs/MIGRACAO-VM-WINDOWS.md](docs/MIGRACAO-VM-WINDOWS.md) | **Levar o servidor para uma VM Windows** (o caminho adotado) |
+| [docs/MIGRACAO-UBUNTU.md](docs/MIGRACAO-UBUNTU.md) | O mesmo, numa VM Ubuntu (caminho alternativo) |
 
 ## As três peças
 
@@ -38,11 +40,6 @@ imprime — ele só guarda a fila e responde ao agente.
 
 Pré-requisitos: Python 3.11+ (por causa do `zoneinfo`), Node.js 18+ e as filas
 da Konica instaladas no Windows do PC da impressora.
-
-O `SumatraPDF.exe` não vem no repositório. Baixe a versão portátil em
-https://www.sumatrapdfreader.org e coloque ao lado do `agente_impressao.py`
-(ou aponte `SUMATRAPDF_EXE` no `agente.env`). O login com Google usa o
-`GOOGLE_CLIENT_ID` do `.env` e o `VITE_GOOGLE_CLIENT_ID` do `Front-end/.env`.
 
 ```powershell
 # 1. Dependências do backend
@@ -75,7 +72,11 @@ app.py                    API Flask: login, fila, envio, relatórios, admin
 banco_dados/__init__.py   Único lugar que toca o SQLite (usuários, pedidos, auditoria)
 agente_impressao.py       Agente que roda no PC da impressora
 automacao_impressora.py   Traduz as opções do pedido em um comando de impressão
-SumatraPDF.exe            Utilitário que envia o PDF para a fila do Windows
+horario_impressao.py      Faixa de horário de impressão (compartilhada servidor/agente)
+opcoes_impressao.py       Regras de folhas/frente e verso (compartilhadas servidor/agente)
+testar_impressao.py       Teste manual de impressão, sem passar pela fila
+deploy/ubuntu/            systemd, nginx, backup e instalador da VM Linux
+SumatraPDF.exe            Utilitário que envia o PDF para a fila do Windows (não vem no repositório: baixe a versão portátil em sumatrapdfreader.org)
 requirements.txt          Dependências Python
 Front-end/                Aplicação React + Vite
   src/app/App.tsx         Tela principal e roteamento por cargo
@@ -87,9 +88,10 @@ docs/                     Esta documentação
 
 | Cargo | Enxerga | Pode editar |
 |---|---|---|
-| **T.I.** | Tudo | Tudo (status, usuários, relatórios) |
+| **T.I.** | Tudo | Usuários e relatórios (status de pedido é alterado só pelo agente) |
 | **Diretor Administrativo** | Fila completa + relatório de custos | Não |
 | **Diretora Pedagógica** | Fila completa + relatório por matéria (abre PDFs) | Não |
+| **Coordenação de Segmento** | Fila e relatório por professor dos **seus segmentos** (Geral = tudo) | Não |
 | **Coordenador** (professor) | Apenas os próprios envios | Não |
 
 Detalhes em [docs/ARQUITETURA.md](docs/ARQUITETURA.md#cargos-e-permissões).

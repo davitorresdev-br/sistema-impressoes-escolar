@@ -23,6 +23,12 @@ import os
 import subprocess
 import time
 
+# A leitura de "o que é frente e verso / colorido / grampeado" mora em
+# opcoes_impressao.py porque o SERVIDOR precisa da mesma definição para
+# contar folhas de papel. Duas cópias da regra é o que faz o sistema
+# prometer uma coisa e fazer outra.
+from opcoes_impressao import interpretar_opcoes, ler_int
+
 try:
     import winreg
 except ImportError:  # não-Windows: só o agente (que roda no Windows) usa isto
@@ -44,7 +50,7 @@ FILAS = {
 # Teto para o SumatraPDF entregar o trabalho ao spooler. Não é o tempo de
 # impressão física — o comando volta assim que o job entra na fila. Existe
 # para o agente não ficar preso para sempre se algo travar.
-TIMEOUT_SEGUNDOS = int(os.environ.get("IMPRESSORA_TIMEOUT_SEGUNDOS", "300"))
+TIMEOUT_SEGUNDOS = ler_int("IMPRESSORA_TIMEOUT_SEGUNDOS", 300)
 
 CHAVE_FILAS = r"Software\Microsoft\Windows NT\CurrentVersion\Devices"
 
@@ -83,10 +89,29 @@ TRABALHO_TRAVADO = (
     "paused",
 )
 
+# Cada estado de bloqueio, dito em português para o professor. O que não
+# estiver aqui cai numa frase genérica com o estado entre parênteses —
+# melhor um nome técnico do que "Erro" sem explicação nenhuma.
+_MOTIVO_POR_ESTADO = {
+    "PaperOut": "A impressora está sem papel",
+    "PaperJam": "Há papel atolado na impressora",
+    "NoToner": "A impressora está sem toner",
+    "DoorOpen": "Uma tampa da impressora está aberta",
+    "Offline": "A impressora está desligada ou fora da rede",
+    "Paused": "A fila de impressão está pausada",
+    "OutputBinFull": "A bandeja de saída está cheia",
+    "UserInterventionRequired": "A impressora precisa de atendimento no painel",
+    "Error": "A impressora está em estado de erro",
+    "OutOfMemory": "A impressora ficou sem memória para este trabalho",
+    "NotAvailable": "A impressora não está disponível",
+    "ServerUnknown": "O servidor de impressão não respondeu",
+    "PendingDeletion": "O trabalho foi removido da fila",
+}
+
 # Quantos segundos observar a fila do servidor depois de entregar o trabalho.
 # 0 desliga a verificação. O custo real costuma ser bem menor: assim que a
 # fila esvazia, paramos de olhar.
-VIGIA_SEGUNDOS = int(os.environ.get("IMPRESSORA_VIGIA_SEGUNDOS", "10"))
+VIGIA_SEGUNDOS = ler_int("IMPRESSORA_VIGIA_SEGUNDOS", 10)
 
 
 def filas_instaladas():
@@ -204,13 +229,16 @@ def acompanhar_fila(nome_fila, ids_antes, segundos=None):
     Observa a fila depois do envio. Devolve (ok, detalhe).
 
     Só devolve `False` quando o spooler diz EXPLICITAMENTE que um trabalho
-    travou. Trabalho ainda imprimindo, fila que não esvaziou dentro da
-    janela, ou consulta que falhou não viram erro: uma apostila de 30
+    NOSSO travou. Trabalho ainda imprimindo, fila que não esvaziou dentro
+    da janela, ou consulta que falhou não viram erro: uma apostila de 30
     cópias legitimamente demora, e marcar isso como falha seria pior que a
     imprecisão que estamos tentando corrigir.
 
-    Não tentamos identificar exatamente o nosso trabalho. Se a fila tem um
-    trabalho travado, o nosso não sai de qualquer forma — a fila é serial.
+    Trabalho que JÁ ESTAVA na fila antes do nosso (ids_antes) é ignorado.
+    Antes, um trabalho de outra pessoa em 'Paused' fazia o nosso pedido
+    virar 'Erro' — e, quando o T.I. retomasse a fila, o papel sairia com o
+    banco dizendo "Erro": consumo fora de toda contagem, e a professora
+    reenviando (papel em dobro) por causa de uma mensagem errada.
     """
     segundos = VIGIA_SEGUNDOS if segundos is None else segundos
     if segundos <= 0:
@@ -226,11 +254,13 @@ def acompanhar_fila(nome_fila, ids_antes, segundos=None):
         consultou = True
 
         for ident, estado in trabalhos:
+            # Só o que NÃO estava na fila antes de nós pode ser nosso.
+            if ident in ids_antes:
+                continue
             comparavel = estado.lower().replace(" ", "").replace(",", "")
             for ruim in TRABALHO_TRAVADO:
                 if ruim in comparavel:
-                    novo = "" if ident in ids_antes else " (recém-enviado)"
-                    return False, f"trabalho #{ident}{novo} travado em '{estado}'"
+                    return False, f"trabalho #{ident} (recém-enviado) travado em '{estado}'"
 
         if not trabalhos:
             return True, "fila esvaziou"
@@ -238,21 +268,6 @@ def acompanhar_fila(nome_fila, ids_antes, segundos=None):
         time.sleep(1)
 
     return True, "ainda em andamento na fila" if consultou else "sem leitura"
-
-
-def interpretar_opcoes(cor, acabamento, frente_verso):
-    """
-    Normaliza as três opções do pedido para booleanos.
-
-    A comparação é tolerante: o front-end manda códigos ("Colorida",
-    "Grampeada", "FrenteVerso"), mas estes campos já chegaram a ser
-    preenchidos com rótulos por extenso ("Colorido", "Grampeado",
-    "Frente e Verso"). Prefixo/substring aceita as duas formas.
-    """
-    colorida = str(cor).strip().lower().startswith("color")
-    grampeada = "grampe" in str(acabamento).strip().lower()
-    duplex = "verso" in str(frente_verso).strip().lower()
-    return colorida, grampeada, duplex
 
 
 def mapear_fila_impressora(cor, acabamento, frente_verso=""):
@@ -281,6 +296,11 @@ def montar_print_settings(colorida, duplex, copias):
     desconhecido é ignorado em silêncio, o que daria papel errado sem
     nenhuma mensagem de erro.
 
+    O tamanho do papel NÃO viaja no comando: A3 é impressão especial, fora
+    do sistema (decisão da gestão em ago/2026) — tudo sai no padrão da
+    fila (A4). Se um dia voltar, o token é `paper=A3`, conferido dentro do
+    binário 3.6.1 junto com `bin=`.
+
     Sem `collate`, a intercalação segue o padrão do driver da Konica (que
     vem ligado). Se algum dia sair 30 páginas 1, depois 30 páginas 2, é aí
     que se olha.
@@ -297,6 +317,12 @@ def montar_print_settings(colorida, duplex, copias):
 
 
 def disparar_impressao_windows(professor_nome, materia, turma, caminho_pdf, copias, cor, frente_verso, acabamento):
+    """Dispara a impressão. Devolve (sucesso, motivo).
+
+    O 'motivo' é escrito PARA O PROFESSOR LER: ele viaja até o servidor e
+    aparece na fila junto do status "Erro". Antes, o erro chegava sem
+    causa nenhuma e a pessoa não sabia se reenviava, esperava ou ligava
+    para alguém."""
     colorida, grampeada, duplex = interpretar_opcoes(cor, acabamento, frente_verso)
     nome_impressora = mapear_fila_impressora(cor, acabamento, frente_verso)
 
@@ -328,19 +354,20 @@ def disparar_impressao_windows(professor_nome, materia, turma, caminho_pdf, copi
     # sem papel nenhum saindo.
     if not os.path.exists(caminho_pdf):
         print(f"❌ [Erro] arquivo PDF não encontrado: {caminho_pdf}")
-        return False
+        return False, "O arquivo não chegou ao computador da impressora. Reenvie o pedido."
 
     instaladas = filas_instaladas()
     if instaladas and nome_impressora.casefold() not in {f.casefold() for f in instaladas}:
         print(f"❌ [Erro] a fila '{nome_impressora}' não existe no Windows para o usuário do agente.")
         print(f"   Filas visíveis: {', '.join(instaladas)}")
-        return False
+        return False, ("A fila de impressão não está configurada no computador da "
+                       "impressora. Avise o Departamento de T.I.")
 
     estado, detalhe = estado_da_impressora(nome_impressora)
     if estado == "problema":
         print(f"❌ [Erro] a impressora está em '{detalhe}' — trabalho não enviado.")
         print("   O pedido volta como Erro em vez de sumir numa fila parada.")
-        return False
+        return False, f"{_MOTIVO_POR_ESTADO.get(detalhe, f'A impressora está indisponível ({detalhe})')}."
     if estado == "desconhecido":
         print(f"⚠️ [Aviso] não deu para conferir o estado da impressora ({detalhe}). Enviando assim mesmo.")
 
@@ -362,16 +389,19 @@ def disparar_impressao_windows(professor_nome, materia, turma, caminho_pdf, copi
         entregue, nota = acompanhar_fila(nome_impressora, ids_antes)
         if not entregue:
             print(f"❌ [Erro] {nota} — o papel não vai sair.")
-            return False
+            return False, ("O trabalho travou na fila da impressora. Verifique papel e "
+                           "toner no equipamento, ou avise o T.I.")
 
         print(f"🖨️ [Enviado] Fila '{nome_impressora}' ({print_settings}) — {nota}")
-        return True
+        return True, None
     except FileNotFoundError:
         print(f"❌ [Erro] SumatraPDF.exe não encontrado em {SUMATRAPDF}")
-        return False
+        return False, "Falha no computador da impressora (programa de impressão ausente). Avise o T.I."
     except subprocess.TimeoutExpired:
         print(f"❌ [Erro] SumatraPDF não respondeu em {TIMEOUT_SEGUNDOS}s — trabalho abortado.")
-        return False
+        return False, ("A impressão demorou demais e foi interrompida. Pode ser fila "
+                       "travada no computador da impressora — avise o T.I.")
     except subprocess.CalledProcessError as e:
         print(f"❌ [Erro] SumatraPDF falhou com código {e.returncode}.")
-        return False
+        return False, ("O arquivo não pôde ser impresso (PDF corrompido ou protegido). "
+                       "Gere o PDF de novo e reenvie.")

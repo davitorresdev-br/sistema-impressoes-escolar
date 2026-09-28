@@ -130,10 +130,13 @@ def main():
         print("=" * 70)
         print(f"CASO: {rotulo}")
         if imprimir_de_verdade:
-            disparar_impressao_windows(
+            sucesso, motivo = disparar_impressao_windows(
                 "Teste de bancada", "Diagnóstico", "T.I.",
                 CAMINHO_PDF, 1, cor, frente_verso, acabamento,
             )
+            if not sucesso:
+                # É a mesma frase que o professor veria na fila.
+                print(f"  ⚠️ motivo relatado ao professor: {motivo}")
         else:
             from automacao_impressora import interpretar_opcoes, mapear_fila_impressora, montar_print_settings
 

@@ -11,3 +11,13 @@ pypdf>=4.0
 # porque o projeto os usa diretamente (tokens de sessão / hash de senha).
 itsdangerous>=2.1
 Werkzeug>=3.0
+# Servidor de produção. O embutido do Flask não é para produção (um upload
+# de 50 MB ocupa a thread e os professores enfileiram atrás dele). waitress
+# é a escolha no Windows — gunicorn não roda aqui. Sem ele instalado o
+# app.py ainda sobe, mas avisando que está no servidor de desenvolvimento.
+waitress>=3.0
+# Base de fusos IANA. O Windows NÃO tem uma (zoneinfo.TZPATH vem vazio),
+# então sem este pacote o ZoneInfo("America/Sao_Paulo") levanta exceção e o
+# servidor morre no import — antes mesmo de abrir o log. No Linux é inerte:
+# o zoneinfo prefere a base do sistema e só cai aqui como reserva.
+tzdata>=2024.1
